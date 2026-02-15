@@ -8,7 +8,7 @@
     <!-- Estilos rápidos -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React y ReactDOM (Versión estable) -->
+    <!-- React y ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -23,7 +23,6 @@
         body { font-family: 'Quicksand', sans-serif; background-color: #FFF8E1; }
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Ocultar barra scroll */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -32,7 +31,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- 1. ÍCONOS INTEGRADOS (Para evitar pantalla blanca) ---
+        // --- 1. ÍCONOS ---
         const Icons = {
             menu: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>,
             cart: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 20a1 1 0 100 2 1 1 0 000-2zm7 0a1 1 0 100 2 1 1 0 000-2zm-7-4h7a2 2 0 002-2V9a2 2 0 00-2-2h-3m-6 0H4L2 5h18"/></svg>,
@@ -44,7 +43,8 @@
             whatsapp: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>,
             credit: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
             user: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-            logout: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            logout: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+            list: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
         };
 
         const Icon = ({ name, size = 20, className = "" }) => {
@@ -53,23 +53,31 @@
             return React.cloneElement(Svg, { width: size, height: size, className });
         };
 
-        // --- 2. CONFIGURACIÓN E INICIALIZACIÓN ---
-        const { useState, useEffect } = React;
+        // --- 2. CONFIGURACIÓN ---
+        const { useState, useEffect, useMemo } = React;
 
-        // Firebase Init con manejo de errores
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'delicias-pame-v2';
+        // Intentar recuperar config de localStorage
+        const savedConfig = localStorage.getItem('delicias_pame_firebase_config');
+        const envConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
         
+        const firebaseConfigStr = savedConfig || envConfig;
+        const firebaseConfig = firebaseConfigStr ? JSON.parse(firebaseConfigStr) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'delicias-pame-prod';
+
         let db, auth;
+        let isFirebaseReady = false;
+
         try {
-            if (firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            auth = firebase.auth();
+            if (Object.keys(firebaseConfig).length > 0) {
+                if (firebase.apps.length === 0) firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+                isFirebaseReady = true;
+            }
         } catch (e) {
-            console.error("Error inicializando Firebase:", e);
+            console.error("Error Firebase:", e);
         }
 
-        // DATOS BANCARIOS PRE-CARGADOS
         const DEFAULT_CONFIG = {
             adminPhone: '593985149118',
             accounts: [
@@ -79,46 +87,51 @@
             ]
         };
 
-        // --- 3. COMPONENTE APP ---
+        // --- 3. APP ---
         function App() {
             const [view, setView] = useState('menu');
             const [cart, setCart] = useState([]);
             const [user, setUser] = useState(null);
             const [isAdmin, setIsAdmin] = useState(false);
 
-            // Login anónimo automático
             useEffect(() => {
                 if(!auth) return;
-                const doLogin = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await auth.signInWithCustomToken(__initial_auth_token);
-                    } else {
-                        await auth.signInAnonymously();
-                    }
+                const login = async () => {
+                    try {
+                        // Intentar login con token o anónimo
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch(e) { console.log("Login status:", e.message); }
                 };
-                doLogin();
-                auth.onAuthStateChanged(u => setUser(u));
+                login();
+                
+                // Escuchar cambios de estado
+                const unsubscribe = auth.onAuthStateChanged(u => setUser(u));
+                return () => unsubscribe();
             }, []);
 
-            // Lógica del Carrito
+            // Carrito
             const addToCart = (item) => {
                 setCart(prev => {
-                    const exist = prev.find(i => i.id === item.id);
-                    if(exist) return prev.map(i => i.id === item.id ? {...i, qty: i.qty+1} : i);
+                    const ex = prev.find(i => i.id === item.id);
+                    if(ex) return prev.map(i => i.id === item.id ? {...i, qty:i.qty+1} : i);
                     return [...prev, {...item, qty:1}];
                 });
             };
-            const updateQty = (id, delta) => setCart(prev => prev.map(i => i.id === id ? {...i, qty: Math.max(1, i.qty+delta)} : i));
+            const updateQty = (id, d) => setCart(prev => prev.map(i => i.id === id ? {...i, qty: Math.max(1, i.qty+d)} : i));
             const remove = (id) => setCart(prev => prev.filter(i => i.id !== id));
             const clear = () => setCart([]);
 
             const renderView = () => {
                 switch(view) {
-                    case 'menu': return <Menu user={user} addToCart={addToCart} />;
-                    case 'cart': return <Cart user={user} cart={cart} updateQty={updateQty} remove={remove} clear={clear} setView={setView} />;
+                    case 'menu': return <Menu addToCart={addToCart} user={user} />;
+                    case 'cart': return <Cart cart={cart} updateQty={updateQty} remove={remove} clear={clear} setView={setView} user={user} />;
                     case 'admin': return <AdminLogin onLogin={() => {setIsAdmin(true); setView('dashboard');}} setView={setView} />;
-                    case 'dashboard': return isAdmin ? <AdminDashboard user={user} setView={setView} /> : <AdminLogin onLogin={() => {setIsAdmin(true); setView('dashboard');}} setView={setView} />;
-                    default: return <Menu user={user} addToCart={addToCart} />;
+                    case 'dashboard': return isAdmin ? <AdminDashboard setView={setView} user={user} /> : <AdminLogin onLogin={() => {setIsAdmin(true); setView('dashboard');}} setView={setView} />;
+                    default: return <Menu addToCart={addToCart} user={user} />;
                 }
             };
 
@@ -135,11 +148,11 @@
                         </div>
                         <div className="flex gap-3">
                             {view === 'menu' && (
-                                <button onClick={() => setView('admin')} className="p-2 hover:bg-orange-600 rounded-full">
+                                <button onClick={() => setView('admin')} className="p-2 hover:bg-orange-600 rounded-full transition-colors">
                                     <Icon name="settings" />
                                 </button>
                             )}
-                            <button onClick={() => setView('cart')} className="relative p-2 hover:bg-orange-600 rounded-full">
+                            <button onClick={() => setView('cart')} className="relative p-2 hover:bg-orange-600 rounded-full transition-colors">
                                 <Icon name="cart" size={24} />
                                 {cart.length > 0 && (
                                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-orange-500">
@@ -149,30 +162,47 @@
                             </button>
                         </div>
                     </div>
-
                     {/* Main */}
                     <div className="flex-1 p-4 pb-20 overflow-y-auto">
+                        {!isFirebaseReady && view !== 'admin' && view !== 'dashboard' && (
+                            <div className="bg-yellow-100 text-yellow-800 p-2 text-xs text-center mb-2 rounded">
+                                Modo Demo (Sin Base de Datos). Los pedidos van solo por WhatsApp.
+                            </div>
+                        )}
                         {renderView()}
                     </div>
                 </div>
             );
         }
 
-        // --- 4. VISTA: MENÚ ---
-        function Menu({ user, addToCart }) {
+        // --- 4. MENÚ ---
+        function Menu({ addToCart, user }) {
             const [items, setItems] = useState([]);
             const [cat, setCat] = useState('Todos');
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                if(!db) return;
+                // Si NO hay Firebase configurado, cargar local y salir
+                if(!isFirebaseReady) {
+                    const localMenu = JSON.parse(localStorage.getItem('delicias_pame_menu_local') || '[]');
+                    setItems(localMenu);
+                    setLoading(false);
+                    return;
+                }
+
+                // Si hay Firebase, ESPERAR a que el usuario esté autenticado
+                if(!user) return;
+
                 const unsub = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu')
                     .onSnapshot(snap => {
                         setItems(snap.docs.map(d => ({id:d.id, ...d.data()})));
                         setLoading(false);
+                    }, error => {
+                        console.error("Error loading menu:", error);
+                        setLoading(false);
                     });
                 return () => unsub();
-            }, []);
+            }, [user]); // Dependencia clave: user
 
             const categories = ['Todos', ...new Set(items.map(i => i.category))];
             const filtered = cat === 'Todos' ? items : items.filter(i => i.category === cat);
@@ -190,7 +220,7 @@
                     </div>
 
                     <div className="grid gap-4">
-                        {filtered.length === 0 && <div className="text-center text-gray-400 mt-10 p-6 border-2 border-dashed border-gray-200 rounded-xl">Menú vacío por ahora.</div>}
+                        {filtered.length === 0 && <div className="text-center text-gray-400 mt-10 p-6 border-2 border-dashed border-gray-200 rounded-xl">Menú vacío.</div>}
                         {filtered.map(item => (
                             <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-orange-50 flex gap-4 items-center">
                                 <div className="text-4xl w-16 h-16 bg-orange-50 rounded-lg flex items-center justify-center shadow-inner">{item.emoji || '🥘'}</div>
@@ -211,39 +241,38 @@
             );
         }
 
-        // --- 5. VISTA: CARRITO ---
-        function Cart({ user, cart, updateQty, remove, clear, setView }) {
+        // --- 5. CARRITO ---
+        function Cart({ cart, updateQty, remove, clear, setView, user }) {
             const [step, setStep] = useState(1);
             const [form, setForm] = useState({ name: '', phone: '', obs: '' });
             const [config, setConfig] = useState(DEFAULT_CONFIG);
 
             useEffect(() => {
-                if(!db) return;
-                // Intentar cargar config, si falla usar DEFAULT
-                db.doc(`artifacts/${appId}/public/data/settings/config`).get().then(snap => {
-                    if(snap.exists && snap.data().accounts) setConfig(snap.data());
-                });
-            }, []);
+                if(isFirebaseReady && user) {
+                    db.doc(`artifacts/${appId}/public/data/settings/config`).get().then(snap => {
+                        if(snap.exists && snap.data().accounts) setConfig(snap.data());
+                    });
+                }
+            }, [user]);
 
             const total = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
 
             const sendOrder = async () => {
-                if(!form.name || !form.phone) return alert("Por favor ingresa nombre y celular");
+                if(!form.name || !form.phone) return alert("Faltan datos");
 
-                // Guardar en Firestore
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').add({
-                        items: cart, customer: form, total, status: 'Pendiente',
-                        createdAt: new Date().toISOString(), timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } catch(e) { console.error(e); }
+                // Guardar en DB solo si hay auth
+                if (isFirebaseReady && user) {
+                    try {
+                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').add({
+                            items: cart, customer: form, total, status: 'Pendiente',
+                            createdAt: new Date().toISOString(), timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } catch(e) { console.error("Error guardando orden", e); }
+                }
 
-                // Generar mensaje WA
+                // WhatsApp
                 const itemsList = cart.map(i => `• ${i.qty}x ${i.name}`).join('%0A');
-                // Lista de cuentas breve para el mensaje
-                const banksShort = config.accounts.map(a => `${a.bank} (${a.number})`).join('%0A');
-                
-                const msg = `Hola! 👋%0ASoy *${form.name}*. Quiero ordenar:%0A%0A${itemsList}%0A%0ATotal: *$${total.toFixed(2)}*%0AObs: ${form.obs}`;
+                const msg = `Hola! 👋%0ASoy *${form.name}*. Pedido:%0A%0A${itemsList}%0A%0ATotal: *$${total.toFixed(2)}*%0AObs: ${form.obs}`;
                 window.open(`https://wa.me/${config.adminPhone}?text=${msg}`, '_blank');
                 
                 clear();
@@ -252,9 +281,9 @@
 
             if(cart.length === 0 && step !== 3) return (
                 <div className="text-center mt-20 text-gray-400 px-6">
-                    <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4 opacity-50"><Icon name="cart" size={40} /></div>
-                    <p className="mb-4">No has agregado nada aún.</p>
-                    <button onClick={() => setView('menu')} className="text-orange-500 font-bold underline">Volver al Menú</button>
+                    <Icon name="cart" size={40} className="mx-auto mb-4 opacity-30" />
+                    <p>Carrito vacío.</p>
+                    <button onClick={() => setView('menu')} className="text-orange-500 font-bold underline mt-2 block">Ver Menú</button>
                 </div>
             );
 
@@ -262,8 +291,7 @@
                 <div className="text-center mt-4 fade-in px-2">
                     <div className="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="check" size={32} /></div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Pedido Enviado!</h2>
-                    <p className="text-gray-600 mb-6 text-sm">Realiza tu pago a una de estas cuentas y envía el comprobante al WhatsApp:</p>
-                    
+                    <p className="text-gray-600 mb-6 text-sm">Realiza el pago a estas cuentas:</p>
                     <div className="space-y-3 mb-8 text-left">
                         {config.accounts.map((acc, idx) => (
                             <div key={idx} className="bg-white p-4 rounded-xl shadow-md border-l-4 border-orange-500 relative">
@@ -277,14 +305,13 @@
                             </div>
                         ))}
                     </div>
-                    <button onClick={() => setView('menu')} className="bg-gray-800 text-white w-full py-3 rounded-xl font-bold">Volver al Inicio</button>
+                    <button onClick={() => setView('menu')} className="bg-gray-800 text-white w-full py-3 rounded-xl font-bold">Volver</button>
                 </div>
             );
 
             return (
                 <div className="fade-in">
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">{step === 1 ? 'Resumen' : 'Datos de Envío'}</h2>
-                    
+                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">{step === 1 ? 'Resumen' : 'Tus Datos'}</h2>
                     {step === 1 ? (
                         <div className="space-y-3">
                             {cart.map(item => (
@@ -305,25 +332,16 @@
                                 <span>Total</span>
                                 <span>${total.toFixed(2)}</span>
                             </div>
-                            <button onClick={() => setStep(2)} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold shadow-lg mt-6 hover:bg-orange-600 transition">Continuar</button>
+                            <button onClick={() => setStep(2)} className="w-full bg-orange-500 text-white py-3 rounded-xl font-bold shadow-lg mt-6 hover:bg-orange-600">Continuar</button>
                         </div>
                     ) : (
                         <div className="bg-white p-5 rounded-xl shadow-sm space-y-4 border border-orange-100">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Tu Nombre</label>
-                                <input className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 ring-orange-200 outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Ej. Juan Pérez" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Celular (WhatsApp)</label>
-                                <input className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 ring-orange-200 outline-none" type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Ej. 099..." />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">Observaciones</label>
-                                <textarea className="w-full p-3 border rounded-lg bg-gray-50 focus:bg-white focus:ring-2 ring-orange-200 outline-none h-20" value={form.obs} onChange={e => setForm({...form, obs: e.target.value})} placeholder="Sin cebolla, aderezo aparte..."></textarea>
-                            </div>
+                            <input className="w-full p-3 border rounded-lg bg-gray-50" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Tu Nombre" />
+                            <input className="w-full p-3 border rounded-lg bg-gray-50" type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Tu Celular" />
+                            <textarea className="w-full p-3 border rounded-lg bg-gray-50 h-20" value={form.obs} onChange={e => setForm({...form, obs: e.target.value})} placeholder="Observaciones..."></textarea>
                             <div className="flex gap-2 pt-2">
                                 <button onClick={() => setStep(1)} className="flex-1 py-3 bg-gray-200 rounded-xl font-bold text-gray-600">Atrás</button>
-                                <button onClick={sendOrder} className="flex-[2] py-3 bg-green-500 text-white rounded-xl font-bold shadow-lg flex justify-center items-center gap-2 hover:bg-green-600">
+                                <button onClick={sendOrder} className="flex-[2] py-3 bg-green-500 text-white rounded-xl font-bold shadow-lg flex justify-center gap-2">
                                     <Icon name="whatsapp" size={20} /> Pedir
                                 </button>
                             </div>
@@ -333,7 +351,7 @@
             );
         }
 
-        // --- 6. ADMIN LOGIN ---
+        // --- 6. LOGIN ---
         function AdminLogin({ onLogin, setView }) {
             const [u, setU] = useState('');
             const [p, setP] = useState('');
@@ -343,7 +361,7 @@
             const check = (e) => {
                 e.preventDefault();
                 if(u.toLowerCase() === 'pamela' && p === 'delicias123') onLogin();
-                else setErr('Usuario o clave incorrecta');
+                else setErr('Incorrecto');
             };
 
             return (
@@ -351,7 +369,7 @@
                     <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-orange-100">
                         <div className="text-center mb-6">
                             <h2 className="text-2xl font-bold text-gray-800">Admin</h2>
-                            <p className="text-xs text-gray-400">Acceso Privado</p>
+                            <p className="text-xs text-gray-400">Pamela Cavagnaro</p>
                         </div>
                         <form onSubmit={check} className="space-y-4">
                             <input className="w-full p-3 border rounded-lg" placeholder="Usuario" value={u} onChange={e=>setU(e.target.value)} />
@@ -369,67 +387,104 @@
             );
         }
 
-        // --- 7. ADMIN DASHBOARD ---
-        function AdminDashboard({ user, setView }) {
-            const [tab, setTab] = useState('pedidos');
+        // --- 7. DASHBOARD & CONSOLIDADO ---
+        function AdminDashboard({ setView, user }) {
+            const [tab, setTab] = useState('consolidado'); // Default al consolidado solicitado
             const [orders, setOrders] = useState([]);
             const [menu, setMenu] = useState([]);
             const [config, setConfig] = useState(DEFAULT_CONFIG);
+            const [dbConfigJson, setDbConfigJson] = useState('');
             
-            // Estados Formulario
+            // Formularios
             const [newItem, setNewItem] = useState({ name: '', price: '', category: 'Almuerzo', emoji: '🥘', description: '' });
-            const [newAcc, setNewAcc] = useState({ bank: '', number: '', type: 'Ahorro', owner: '', id: '' });
-            const [showAccForm, setShowAccForm] = useState(false);
-
+            
+            // Carga Inicial
             useEffect(() => {
-                if(!db) return;
+                if (!isFirebaseReady) {
+                    // Cargar Menú Local si no hay DB
+                    const localM = JSON.parse(localStorage.getItem('delicias_pame_menu_local') || '[]');
+                    setMenu(localM);
+                    return;
+                }
+
+                // Esperar a AUTH
+                if (!user) return;
+
                 const u1 = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders')
-                    .orderBy('timestamp', 'desc').onSnapshot(s => setOrders(s.docs.map(d => ({id:d.id, ...d.data()}))));
+                    .orderBy('timestamp', 'desc').onSnapshot(s => setOrders(s.docs.map(d => ({id:d.id, ...d.data()}))), e => console.log(e));
                 const u2 = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu')
-                    .onSnapshot(s => setMenu(s.docs.map(d => ({id:d.id, ...d.data()}))));
+                    .onSnapshot(s => setMenu(s.docs.map(d => ({id:d.id, ...d.data()}))), e => console.log(e));
                 
                 db.doc(`artifacts/${appId}/public/data/settings/config`).get().then(s => {
                     if(s.exists && s.data().accounts) setConfig(s.data());
-                    else saveConfig(DEFAULT_CONFIG);
                 });
 
                 return () => { u1(); u2(); };
-            }, []);
+            }, [user]); // Dependencia user
 
-            const saveConfig = async (data = config) => {
-                await db.doc(`artifacts/${appId}/public/data/settings/config`).set(data);
-                if(data === config) alert("Configuración guardada");
+            // Guardar Config Firebase Manualmente
+            const saveFirebaseConfig = () => {
+                try {
+                    const parsed = JSON.parse(dbConfigJson);
+                    localStorage.setItem('delicias_pame_firebase_config', JSON.stringify(parsed));
+                    alert("Configuración Guardada. Recarga la página.");
+                    window.location.reload();
+                } catch(e) { alert("JSON Inválido"); }
             };
 
             // Acciones Menú
             const addDish = async () => {
                 if(!newItem.name || !newItem.price) return;
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').add({...newItem, price: parseFloat(newItem.price)});
-                setNewItem({...newItem, name: '', price: ''});
-            };
-            const delDish = async (id) => { if(confirm("¿Eliminar?")) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete(); };
-
-            // Acciones Cuentas
-            const addAcc = () => {
-                if(!newAcc.bank) return;
-                const newC = {...config, accounts: [...config.accounts, newAcc]};
-                setConfig(newC);
-                saveConfig(newC);
-                setNewAcc({ bank: '', number: '', type: 'Ahorro', owner: '', id: '' });
-                setShowAccForm(false);
-            };
-            const delAcc = (idx) => {
-                if(!confirm("¿Eliminar cuenta?")) return;
-                const newC = {...config, accounts: config.accounts.filter((_, i) => i !== idx)};
-                setConfig(newC);
-                saveConfig(newC);
+                const dish = {...newItem, price: parseFloat(newItem.price), id: Date.now().toString()}; // ID temporal para local
+                
+                if (isFirebaseReady && user) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').add(dish);
+                    setNewItem({ name: '', price: '', category: 'Almuerzo', emoji: '🥘', description: '' });
+                } else {
+                    // Guardar Local
+                    const updated = [...menu, dish];
+                    setMenu(updated);
+                    localStorage.setItem('delicias_pame_menu_local', JSON.stringify(updated));
+                    setNewItem({ name: '', price: '', category: 'Almuerzo', emoji: '🥘', description: '' });
+                    alert("Plato guardado LOCALMENTE (Solo tú lo ves). Para que lo vean otros, conecta la base de datos.");
+                }
             };
 
-            // Mensaje de Cobro
-            const sendBill = (order) => {
+            const delDish = async (id) => { 
+                if(!confirm("¿Eliminar?")) return;
+                if(isFirebaseReady && user) {
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete();
+                } else {
+                    const updated = menu.filter(m => m.id !== id);
+                    setMenu(updated);
+                    localStorage.setItem('delicias_pame_menu_local', JSON.stringify(updated));
+                }
+            };
+
+            // --- LÓGICA DE CONSOLIDADO ---
+            const consolidated = useMemo(() => {
+                const grouped = {};
+                orders.forEach(o => {
+                    if (!grouped[o.customer.name]) {
+                        grouped[o.customer.name] = { 
+                            name: o.customer.name, 
+                            phone: o.customer.phone, 
+                            total: 0, 
+                            orders: [] 
+                        };
+                    }
+                    grouped[o.customer.name].total += o.total;
+                    grouped[o.customer.name].orders.push(o);
+                });
+                return Object.values(grouped);
+            }, [orders]);
+
+            const sendConsolidatedBill = (group) => {
                 const accText = config.accounts.map(a => `🏦 ${a.bank}: ${a.number} (${a.type})`).join('%0A');
-                const msg = `Hola ${order.customer.name}! 👋%0AEspero que hayas disfrutado tu pedido de *Delicias Pame*.%0A%0ATienes un valor pendiente de: *$${order.total.toFixed(2)}*.%0A%0APuedes transferir a:%0A${accText}%0A%0A¡Gracias por tu apoyo! 😊`;
-                window.open(`https://wa.me/${order.customer.phone}?text=${msg}`, '_blank');
+                const detail = group.orders.map(o => `- Pedido ${new Date(o.createdAt).toLocaleDateString()}: $${o.total.toFixed(2)}`).join('%0A');
+                
+                const msg = `Hola ${group.name}! 👋%0A%0AAquí tienes tu resumen de pedidos pendientes:%0A${detail}%0A%0A*TOTAL A PAGAR: $${group.total.toFixed(2)}*%0A%0ACuentas:%0A${accText}%0A%0AGracias! 😊`;
+                window.open(`https://wa.me/${group.phone}?text=${msg}`, '_blank');
             };
 
             return (
@@ -444,37 +499,83 @@
                         </button>
                     </div>
 
-                    <div className="flex bg-white rounded-lg p-1 mb-4 shadow-sm border border-gray-100">
-                        {['pedidos', 'menu', 'config'].map(t => (
-                            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-sm font-bold rounded capitalize transition-all ${tab===t ? 'bg-orange-500 text-white shadow' : 'text-gray-400 hover:bg-gray-50'}`}>{t}</button>
+                    {!isFirebaseReady && (
+                        <div className="bg-red-50 border border-red-200 p-4 rounded-xl mb-4 text-sm">
+                            <p className="font-bold text-red-600 mb-2">⚠️ Base de Datos No Conectada</p>
+                            <p className="text-gray-600 mb-2">En GitHub, necesitas conectar tu propia base de datos Firebase para que los clientes vean el menú y los pedidos lleguen aquí.</p>
+                            <details className="cursor-pointer">
+                                <summary className="font-bold text-orange-600">Haz clic para Configurar</summary>
+                                <div className="mt-2">
+                                    <p className="mb-1">Pega aquí tu configuración de Firebase (el objeto JSON):</p>
+                                    <textarea 
+                                        className="w-full p-2 border rounded text-xs font-mono h-24" 
+                                        placeholder='{"apiKey": "AIza...", "authDomain": "..."}'
+                                        value={dbConfigJson}
+                                        onChange={e => setDbConfigJson(e.target.value)}
+                                    ></textarea>
+                                    <button onClick={saveFirebaseConfig} className="bg-gray-800 text-white px-3 py-1 rounded mt-2">Guardar y Recargar</button>
+                                </div>
+                            </details>
+                        </div>
+                    )}
+
+                    <div className="flex bg-white rounded-lg p-1 mb-4 shadow-sm border border-gray-100 overflow-x-auto">
+                        {['consolidado', 'pedidos', 'menu', 'config'].map(t => (
+                            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 px-3 text-sm font-bold rounded capitalize whitespace-nowrap ${tab===t ? 'bg-orange-500 text-white shadow' : 'text-gray-400'}`}>{t}</button>
                         ))}
                     </div>
 
-                    {tab === 'pedidos' && (
+                    {tab === 'consolidado' && (
                         <div className="space-y-3">
                             <div className="bg-orange-100 p-3 rounded-lg flex justify-between items-center border border-orange-200">
-                                <span className="text-orange-800 font-bold text-sm">Total por cobrar</span>
-                                <span className="text-2xl font-bold text-orange-600">${orders.reduce((a,b)=>a+b.total,0).toFixed(2)}</span>
+                                <span className="text-orange-800 font-bold text-sm">Por Cobrar Total</span>
+                                <span className="text-2xl font-bold text-orange-600">${consolidated.reduce((a,b)=>a+b.total,0).toFixed(2)}</span>
                             </div>
-                            {orders.map(o => (
-                                <div key={o.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <span className="font-bold text-lg text-gray-800">{o.customer.name}</span>
-                                            <p className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleString()}</p>
-                                        </div>
-                                        <span className="font-bold text-orange-600 text-xl">${o.total.toFixed(2)}</span>
+                            
+                            <h3 className="font-bold text-gray-700 mt-2 flex items-center gap-2">
+                                <Icon name="list" size={18}/> Lista de Cobro Masivo
+                            </h3>
+                            
+                            {consolidated.length === 0 && <p className="text-gray-400 text-center py-6">No hay deudas pendientes.</p>}
+
+                            {consolidated.map((group, idx) => (
+                                <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold text-lg text-gray-800">{group.name}</p>
+                                        <p className="text-xs text-gray-500">{group.orders.length} pedidos pendientes</p>
                                     </div>
-                                    <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded mb-3">
-                                        {o.items.map((i, idx) => <span key={idx} className="block">• {i.qty} {i.name}</span>)}
+                                    <div className="text-right">
+                                        <p className="font-bold text-orange-600 text-xl block mb-1">${group.total.toFixed(2)}</p>
+                                        <button 
+                                            onClick={() => sendConsolidatedBill(group)}
+                                            className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold border border-green-200 hover:bg-green-200 flex items-center gap-1 ml-auto"
+                                        >
+                                            <Icon name="whatsapp" size={12}/> Cobrar
+                                        </button>
                                     </div>
-                                    <button onClick={() => sendBill(o)} className="w-full bg-green-50 text-green-700 py-2 rounded-lg text-sm font-bold border border-green-200 flex items-center justify-center gap-2 hover:bg-green-100 transition">
-                                        <Icon name="whatsapp" size={16} /> Enviar Cobro Bonito
-                                    </button>
-                                    <button onClick={async ()=>{if(confirm("¿Borrar?")) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').doc(o.id).delete()}} className="absolute top-2 right-2 text-red-300 hover:text-red-500"><Icon name="trash" size={16}/></button>
                                 </div>
                             ))}
-                            {orders.length === 0 && <p className="text-center text-gray-400 py-10">No hay pedidos pendientes.</p>}
+                        </div>
+                    )}
+
+                    {tab === 'pedidos' && (
+                        <div className="space-y-3">
+                             <p className="text-xs text-gray-400 text-center">Historial Individual</p>
+                            {orders.map(o => (
+                                <div key={o.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative opacity-75 hover:opacity-100">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className="font-bold text-gray-800">{o.customer.name}</span>
+                                            <p className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString()}</p>
+                                        </div>
+                                        <span className="font-bold text-gray-600">${o.total.toFixed(2)}</span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-gray-500">
+                                        {o.items.map((i, idx) => <span key={idx} className="mr-2">{i.qty} {i.name},</span>)}
+                                    </div>
+                                    <button onClick={async ()=>{if(confirm("¿Borrar?")) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').doc(o.id).delete()}} className="absolute top-2 right-2 text-red-300 hover:text-red-500"><Icon name="trash" size={14}/></button>
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -510,51 +611,10 @@
                     )}
 
                     {tab === 'config' && (
-                        <div className="space-y-4">
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                                <p className="text-xs font-bold text-gray-400 uppercase mb-1">Tu WhatsApp (Sin +)</p>
-                                <div className="flex gap-2">
-                                    <input className="w-full border-b-2 border-orange-100 p-2 font-mono text-lg text-gray-700 focus:border-orange-500 outline-none" value={config.adminPhone} onChange={e=>setConfig({...config, adminPhone: e.target.value})} />
-                                    <button onClick={() => saveConfig()} className="bg-gray-800 text-white px-4 rounded font-bold"><Icon name="check" size={18}/></button>
-                                </div>
-                            </div>
-
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><Icon name="credit" size={18} /> Cuentas Bancarias</h3>
-                                    <button onClick={() => setShowAccForm(!showAccForm)} className="bg-green-100 text-green-700 p-1 rounded hover:bg-green-200"><Icon name="plus" size={20}/></button>
-                                </div>
-
-                                {showAccForm && (
-                                    <div className="bg-green-50 p-3 rounded-lg mb-4 border border-green-200 animate-fade-in">
-                                        <p className="text-xs font-bold text-green-800 mb-2">Nueva Cuenta</p>
-                                        <input className="w-full mb-2 p-2 rounded text-sm border" placeholder="Banco (Ej. Pichincha)" value={newAcc.bank} onChange={e=>setNewAcc({...newAcc, bank:e.target.value})} />
-                                        <div className="flex gap-2 mb-2">
-                                            <input className="flex-1 p-2 rounded text-sm border" placeholder="Número" value={newAcc.number} onChange={e=>setNewAcc({...newAcc, number:e.target.value})} />
-                                            <select className="p-2 rounded text-sm border" value={newAcc.type} onChange={e=>setNewAcc({...newAcc, type:e.target.value})}>
-                                                <option value="Ahorro">Ahorro</option>
-                                                <option value="Cte">Cte</option>
-                                            </select>
-                                        </div>
-                                        <input className="w-full mb-2 p-2 rounded text-sm border" placeholder="Titular" value={newAcc.owner} onChange={e=>setNewAcc({...newAcc, owner:e.target.value})} />
-                                        <input className="w-full mb-2 p-2 rounded text-sm border" placeholder="Cédula" value={newAcc.id} onChange={e=>setNewAcc({...newAcc, id:e.target.value})} />
-                                        <button onClick={addAcc} className="w-full bg-green-600 text-white py-2 rounded font-bold text-sm">Guardar</button>
-                                    </div>
-                                )}
-
-                                <div className="space-y-3">
-                                    {config.accounts.map((acc, idx) => (
-                                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200 relative group">
-                                            <div className="flex justify-between">
-                                                <span className="font-bold text-gray-800">{acc.bank}</span>
-                                                <span className="text-xs bg-white border px-2 rounded-full py-0.5">{acc.type}</span>
-                                            </div>
-                                            <p className="font-mono text-gray-600 mt-1">{acc.number}</p>
-                                            <p className="text-xs text-gray-400 mt-1">{acc.owner} - {acc.id}</p>
-                                            <button onClick={() => delAcc(idx)} className="absolute top-2 right-2 text-red-300 hover:text-red-500"><Icon name="trash" size={16}/></button>
-                                        </div>
-                                    ))}
-                                </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
+                            <p className="text-gray-500 text-sm mb-4">La configuración bancaria está protegida. Edita el código fuente para cambiarla permanentemente o usa la base de datos.</p>
+                            <div className="text-left bg-gray-50 p-3 rounded text-xs text-gray-500 font-mono">
+                                {config.accounts.map(a => <div key={a.number} className="mb-1">{a.bank}: {a.number}</div>)}
                             </div>
                         </div>
                     )}
