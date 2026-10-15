@@ -399,9 +399,8 @@
             };
             const delDish = async (id) => {
                 if(!confirm("¿Eliminar?")) return;
-                if(isFirebaseReady && user) {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete();
-                } else {
+                if(isFirebaseReady && user) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete();
+                else {
                     const up = menu.filter(m => m.id !== id);
                     setMenu(up);
                     localStorage.setItem('delicias_pame_menu_local', JSON.stringify(up));
@@ -459,6 +458,7 @@
                 
                 if(isFirebaseReady && user) {
                     const batch = db.batch();
+                    // Nota: Firestore limita batches a 500, pero para uso de pyme está bien.
                     orders.forEach(o => {
                         const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').doc(o.id);
                         batch.delete(ref);
@@ -481,6 +481,7 @@
                     });
                     await batch.commit();
                 } else {
+                    // Local update logic simulation (complex, easier to just reload for local demo)
                     alert("En modo demo local, el estado se actualiza al recargar.");
                 }
             }
