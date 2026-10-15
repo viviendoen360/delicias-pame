@@ -397,10 +397,17 @@
                 }
                 setNewItem({ name: '', price: '', category: 'Almuerzo', emoji: '🥘', description: '' });
             };
+
             const delDish = async (id) => {
-                if(!confirm("¿Eliminar?")) return;
-                if(isFirebaseReady && user) await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete();
-                else {
+                if(!confirm("¿Estás segura de eliminar este plato?")) return;
+                if(isFirebaseReady && user) {
+                    try {
+                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('menu').doc(id).delete();
+                    } catch(e) {
+                        console.error("Error al borrar en Firebase:", e);
+                        alert("No se pudo eliminar de la base de datos.");
+                    }
+                } else {
                     const up = menu.filter(m => m.id !== id);
                     setMenu(up);
                     localStorage.setItem('delicias_pame_menu_local', JSON.stringify(up));
@@ -408,7 +415,7 @@
             };
 
             const addAcc = () => { if(!newAcc.bank) return; const newC = {...config, accounts: [...(config.accounts||[]), newAcc]}; saveConfig(newC); setNewAcc({bank:'',number:'',type:'Ahorro',owner:'',id:''}); setShowAccForm(false); };
-            const delAcc = (idx) => { if(!confirm("¿Borrar?")) return; const newC = {...config, accounts: config.accounts.filter((_,i)=>i!==idx)}; saveConfig(newC); };
+            const delAcc = (idx) => { if(!confirm("¿Borrar cuenta?")) return; const newC = {...config, accounts: config.accounts.filter((_,i)=>i!==idx)}; saveConfig(newC); };
 
             // --- NUEVAS FUNCIONALIDADES ---
 
@@ -458,7 +465,6 @@
                 
                 if(isFirebaseReady && user) {
                     const batch = db.batch();
-                    // Nota: Firestore limita batches a 500, pero para uso de pyme está bien.
                     orders.forEach(o => {
                         const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('orders').doc(o.id);
                         batch.delete(ref);
@@ -481,7 +487,6 @@
                     });
                     await batch.commit();
                 } else {
-                    // Local update logic simulation (complex, easier to just reload for local demo)
                     alert("En modo demo local, el estado se actualiza al recargar.");
                 }
             }
@@ -580,7 +585,7 @@
                                 {menu.map(m => (
                                     <div key={m.id} className="bg-white p-2 rounded-lg flex justify-between items-center shadow-sm border border-gray-50">
                                         <div className="flex items-center gap-3"><span className="text-2xl">{m.emoji}</span><div><p className="font-bold text-sm">{m.name}</p><p className="text-xs text-orange-500 font-bold">${m.price}</p></div></div>
-                                        <button onClick={() => delDish(m.id)} className="text-red-400 p-2"><Icon name="trash" size={16} /></button>
+                                        <button onClick={() => delDish(m.id)} className="text-red-400 p-2 hover:bg-red-50 rounded"><Icon name="trash" size={16} /></button>
                                     </div>
                                 ))}
                             </div>
