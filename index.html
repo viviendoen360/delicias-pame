@@ -60,10 +60,15 @@
         // --- 2. CONFIGURACIÓN ---
         const { useState, useEffect, useMemo } = React;
 
-        const savedConfig = localStorage.getItem('delicias_pame_firebase_config');
-        const envConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-        const firebaseConfigStr = savedConfig || envConfig;
-        const firebaseConfig = firebaseConfigStr ? JSON.parse(firebaseConfigStr) : {};
+        const firebaseConfig = {
+  apiKey: "AIzaSyDXulS9nO7_SoGRMyw7ckUyXfaCEGFb7-E",
+  authDomain: "delicias-pame-app.firebaseapp.com",
+  projectId: "delicias-pame-app",
+  storageBucket: "delicias-pame-app.firebasestorage.app",
+  messagingSenderId: "940979056140",
+  appId: "1:940979056140:web:c26dfca3f5fab70e3e4829",
+  measurementId: "G-L74M9TLS6H"
+};
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'delicias-pame-prod';
 
         let db, auth;
